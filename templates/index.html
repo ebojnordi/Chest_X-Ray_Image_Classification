@@ -1,17 +1,198 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Pneumonia Classifier</title>
-</head>
-<body>
-    <h1>Pneumonia Classifier</h1>
-    <form action="/" enctype="multipart/form-data" method="post">
-        <input type="file" name="file" accept="image/*">
-        <input type="submit" value="Predict">
-    </form>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pneumonia Predictor</title>
 
-    {% if prediction %}
-    <h2>Prediction: {{ prediction }}</h2>
-    {% endif %}
-</body>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+
+  <body class="h-full">
+    <div class="gradient-bg min-h-full w-full py-6 px-4">
+      <div class="max-w-5xl mx-auto">
+        <header class="mb-4">
+          <h2 id="page-title" class="text-3xl font-bold text-white mb-2">
+            Pneumonia Predictor
+          </h2>
+          <p id="page-subtitle" class="text-white opacity-90">
+            Upload a chest X-ray image and analyze it with AI
+          </p>
+        </header>
+
+        <div class="card p-6">
+          <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+            <p id="about" class="text-sm text-gray-700">
+              <b>About this application:</b> This powerful ML pneumonia
+              prediction tool has been trained using an advanced artificial
+              neural network (ResNet-18) to analyze chest X-ray images and
+              provide instant predictions of pneumonia. Simply upload a chest
+              X-ray image, click <i>Run Predict</i>, and get results in seconds.
+            </p>
+            <div class="mt-6">
+              <h3 class="text-sm font-semibold text-gray-700 mb-3">
+                Model Performance Metrics
+              </h3>
+
+              <div
+                class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm"
+              >
+                <table class="min-w-full bg-white text-sm text-gray-700">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left font-semibold">Dataset</th>
+                      <th class="px-4 py-2 text-center font-semibold">
+                        Accuracy
+                      </th>
+                      <th class="px-4 py-2 text-center font-semibold">
+                        Precision
+                      </th>
+                      <th class="px-4 py-2 text-center font-semibold">
+                        Recall
+                      </th>
+                      <th class="px-4 py-2 text-center font-semibold">
+                        F1-score
+                      </th>
+                      <th class="px-4 py-2 text-center font-semibold">
+                        Balanced Accuracy
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody class="divide-y divide-gray-200">
+                    <!-- Validation -->
+                    <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-2 font-medium">Validation</td>
+                      <td class="px-4 py-2 text-center">0.9375 (93.75%)</td>
+                      <td class="px-4 py-2 text-center">0.8889 (88.89%)</td>
+                      <td
+                        class="px-4 py-2 text-center text-green-600 font-semibold"
+                      >
+                        1.0000 (100%)
+                      </td>
+                      <td class="px-4 py-2 text-center">0.9412 (94.12%)</td>
+                      <td class="px-4 py-2 text-center">0.9375 (93.75%)</td>
+                    </tr>
+
+                    <!-- Test -->
+                    <tr class="hover:bg-gray-50 transition">
+                      <td class="px-4 py-2 font-medium">Test</td>
+                      <td class="px-4 py-2 text-center">0.7452 (74.52%)</td>
+                      <td class="px-4 py-2 text-center">0.7104 (71.04%)</td>
+                      <td
+                        class="px-4 py-2 text-center text-green-600 font-semibold"
+                      >
+                        1.0000 (100%)
+                      </td>
+                      <td class="px-4 py-2 text-center">0.8307 (83.07%)</td>
+                      <td class="px-4 py-2 text-center">0.6603 (66.03%)</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Training note -->
+              <p class="text-xs text-gray-500 mt-2">
+                Model trained for 10 epochs using a ResNet-18 architecture.
+              </p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-6">
+            <div>
+              <label class="block font-semibold mb-2">Upload Image</label>
+
+              <div
+                id="upload-area"
+                class="upload-area rounded-lg p-6 text-center cursor-pointer"
+              >
+                <input
+                  type="file"
+                  id="image-upload"
+                  accept="image/*"
+                  class="hidden"
+                />
+                <button
+                  id="upload-button"
+                  class="bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded-lg"
+                >
+                  Choose Image
+                </button>
+                <p class="text-xs text-gray-500 mt-2">or drag & drop</p>
+              </div>
+
+              <div class="text-center mt-4">
+                <button
+                  id="predict-button"
+                  disabled
+                  class="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-2 px-8 rounded-lg"
+                >
+                  Run Prediction
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-semibold mb-2">Preview</label>
+              <div
+                id="image-container"
+                class="image-placeholder rounded-lg h-52 flex items-center justify-center"
+              >
+                <p class="text-gray-400 text-sm">No image uploaded</p>
+              </div>
+            </div>
+          </div>
+
+          <div id="results-section" class="hidden mt-6">
+            <label class="font-semibold block mb-2"> Prediction Results </label>
+
+            <div
+              class="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg"
+            >
+              <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="result-label bg-white p-3 rounded shadow">
+                  <p class="text-xs text-gray-500">Prediction</p>
+                  <p id="prediction-label" class="text-lg font-bold">-</p>
+                </div>
+
+                <div class="result-label bg-white p-3 rounded shadow">
+                  <p class="text-xs text-gray-500">Confidence</p>
+                  <p
+                    id="confidence-label"
+                    class="text-lg font-bold text-green-600"
+                  >
+                    -
+                  </p>
+                </div>
+
+                <div class="result-label bg-white p-3 rounded shadow">
+                  <p class="text-xs text-gray-500">Processing Time</p>
+                  <p id="time-label">-</p>
+                </div>
+              </div>
+              <div class="bg-white rounded-lg p-3 shadow-sm">
+                <label
+                  for="result-description"
+                  class="block text-xs text-gray-500 mb-1"
+                  >Result Description</label
+                >
+
+                <textarea
+                  id="result-description"
+                  readonly
+                  rows="3"
+                  class="w-full p-2 text-sm border rounded bg-gray-50"
+                >
+                        No prediction yet
+                </textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+  </body>
 </html>

@@ -5,7 +5,14 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms, models
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    balanced_accuracy_score
+)
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -92,8 +99,20 @@ for epoch in range(num_epochs):
             val_labels.extend(labels.cpu().numpy())
             val_preds.extend(preds.cpu().numpy())
             
+    #-----Metrics-----
     val_accuracy = accuracy_score(val_labels, val_preds)
-    print('Validation accuracy: ', val_accuracy)
+    val_precision = precision_score(val_labels, val_preds)
+    val_recall = recall_score(val_labels, val_preds)
+    val_f1 = f1_score(val_labels, val_preds)
+    val_balanced_acc = balanced_accuracy_score(val_labels, val_preds)
+    
+    print(
+    f"Validation | "
+    f"Acc: {val_accuracy:.4f} | "
+    f"Prec: {val_precision:.4f} | "
+    f"Recall: {val_recall:.4f} | "
+    f"F1: {val_f1:.4f} | "
+    f"Bal Acc: {val_balanced_acc:.4f}")
     
 model.eval()
 test_labels = []
@@ -110,10 +129,22 @@ with torch.no_grad():
             test_labels.extend(labels.cpu().numpy())
             test_preds.extend(preds.cpu().numpy())
             
+#-----Metrics-----
 test_accuracy = accuracy_score(test_labels, test_preds)
-print('Test accuracy: ', test_accuracy)
+test_precision = precision_score(test_labels, test_preds)
+test_recall = recall_score(test_labels, test_preds)
+test_f1 = f1_score(test_labels, test_preds)
+test_balanced_acc = balanced_accuracy_score(test_labels, test_preds)
 
-torch.save(model.state_dict(), 'pneumonia_classifier.pth')
+print(
+    f"Test | "
+    f"Acc: {test_accuracy:.4f} | "
+    f"Prec: {test_precision:.4f} | "
+    f"Recall: {test_recall:.4f} | "
+    f"F1: {test_f1:.4f} | "
+    f"Bal Acc: {test_balanced_acc:.4f}")
+
+torch.save(model.state_dict(), 'model/pneumonia_classifier.pth')
 
 
 

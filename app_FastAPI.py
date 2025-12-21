@@ -1,63 +1,77 @@
-from fastapi import FastAPI, UploadFile, File, Request, Form
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi import Request
 import torch
 import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
 import os
-import shutil
+import time
 
+# -------------------
 # Setup
+# -------------------
 app = FastAPI()
-UPLOAD_FOLDER = "static/uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Device
+UPLOAD_FOLDER = "static/uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Load model
+# -------------------
+# Model
+# -------------------
 model = models.resnet18(weights=None)
-model.fc = nn.Linear(model.fc.in_features, 2)  # NORMAL, PNEUMONIA
-model.load_state_dict(torch.load("pneumonia_classifier.pth", map_location=device))
-model = model.to(device)
+model.fc = nn.Linear(model.fc.in_features, 2)
+model.load_state_dict(torch.load("model/pneumonia_classifier.pth", map_location=device))
+model.to(device)
 model.eval()
 
-# Transform
+classes = ["NORMAL", "PNEUMONIA"]
+
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225],
+    ),
 ])
 
-# Classes
-classes = ["NORMAL", "PNEUMONIA"]
-
+# -------------------
 # Routes
+# -------------------
 @app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "prediction": None})
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
-@app.post("/", response_class=HTMLResponse)
-async def predict(request: Request, file: UploadFile = File(...)):
-    filepath = os.path.join(UPLOAD_FOLDER, file.filename)
-    # Save uploaded file
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
 
-    # Load and preprocess
-    image = Image.open(filepath).convert("RGB")
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    start_time = time.time()
+
+    image = Image.open(file.file).convert("RGB")
     image = transform(image).unsqueeze(0).to(device)
 
-    # Predict
     with torch.no_grad():
         outputs = model(image)
-        _, preds = torch.max(outputs, 1)
-        prediction = classes[preds.item()]
+        probs = torch.softmax(outputs, dim=1)
+        conf, pred = torch.max(probs, 1)
 
-    return templates.TemplateResponse("index.html", {"request": request, "prediction": prediction})
+    processing_time = int((time.time() - start_time) * 1000)
+
+    return JSONResponse({
+        "label": classes[pred.item()],
+        "confidence": round(conf.item() * 100, 2),
+        "processing_time_ms": processing_time,
+        "description": (
+            "Signs of pneumonia detected in the chest X-ray."
+            if classes[pred.item()] == "PNEUMONIA"
+            else "No signs of pneumonia detected. The X-ray appears normal."
+        )
+    })

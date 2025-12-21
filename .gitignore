@@ -7,4 +7,4 @@ __pycache__/
 *.pyc
 *.pth
 *.zip
-static\uploads\
+static/uploads/
